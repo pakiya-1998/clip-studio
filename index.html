@@ -15,150 +15,215 @@ button.alt{background:#2a3142}
 .clip video{width:90px;border-radius:6px;background:#000}.clip .m{flex:1;font-size:13px}
 .clip a{width:auto;padding:8px 12px;background:#2a3142;color:#fff;border-radius:8px;text-decoration:none;font-size:13px}
 pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-size:12px;max-height:220px;overflow:auto}
-.note{font-size:12px;color:#8a93a6}progress{width:100%}
+.note{font-size:12px;color:#8a93a6}progress{width:100%}details{background:#181b22;border:1px solid #262b36;border-radius:12px;margin:10px 0;padding:0 14px}summary{padding:14px 0;font-weight:600;cursor:pointer}details[open] summary{border-bottom:1px solid #262b36;margin-bottom:8px}details>div{padding-bottom:12px}.radio label{display:inline-block;margin-right:14px;color:#e8eaf0;font-size:15px}.radio input{width:auto;margin-right:4px}.chk label{display:flex;align-items:center;gap:8px;color:#e8eaf0;font-size:15px}.chk input{width:auto}.ch{display:flex;align-items:center;gap:8px;padding:10px;background:#1b2740;border-radius:8px;margin-top:8px}.ch span{flex:1;font-size:14px}.ch button{width:auto;margin:0;padding:8px 12px}.warn{background:#3a3016;color:#ffd666;padding:10px;border-radius:8px;font-size:14px}#log{font-size:11px}input[type=range]{padding:0}
 </style></head><body>
-<h1>Auto Clip Studio</h1>
-<div class="note">Lamba video chuno, ye khud best hisse dhundh ke vertical 9:16 clips banata hai. Sab kuch tumhare browser me hota hai, video kahin upload nahi hota. Free, sleep mode nahi.</div>
+<svg width="0" height="0" style="position:absolute"><filter id="sharp"><feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0"/></filter></svg>
+<h1>🎬 Multi-Channel Shorts Automator</h1>
+<div class="note">Video se vertical Shorts banao, schedule karo, YouTube pe bhejo. Sab tumhare browser me hota hai (video kahin upload nahi hota). Free, sleep mode nahi.</div>
 
-<div class="card"><h2>1. Video</h2>
-<input type="file" id="file" accept="video/*">
-<div class="row"><div><label>Clip ki length (sec)</label><select id="len"><option>15</option><option>20</option><option selected>30</option><option>45</option><option>60</option></select></div>
-<div><label>Kitne clips</label><select id="n"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option></select></div></div>
-<label>Engine</label><select id="eng"><option value="safe">Phone-safe (jaldi, kam memory, real-time recording)</option><option value="ff">Quality (ffmpeg, bhari, laptop ke liye)</option></select>
-<label>Hisse kaise chune</label><select id="mode"><option value="loud">Sabse tez awaaz / josh wale hisse</option><option value="even">Barabar hisso me baantna</option><option value="manual">Mai start time khud daalunga</option></select>
+<details><summary>📺 YouTube Accounts</summary><div>
+<div class="note">Teen channels connect karo: Kids, Gaming aur Story Podcast. Har channel ke liye Google authorization ek baar karna padega (Connect dabao, Google me wahi account/channel chuno).</div>
+<label>Google OAuth Client ID (ek baar paste karo, yaha save rahega)</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com">
+<div id="chs"></div>
+<div class="note" id="cnote"></div></div></details>
+
+<details open><summary>🎯 Content Type</summary><div class="radio" id="ctype">
+<label><input type="radio" name="ct" value="kids" checked>🧸 Kids</label><label><input type="radio" name="ct" value="gaming">🎮 Gaming</label><label><input type="radio" name="ct" value="story">🎙️ Story Podcast</label></div></details>
+
+<details open><summary>🎬 Video Source</summary><div>
+<div class="radio"><label><input type="radio" name="src" value="up" checked>📤 Upload Video</label><label><input type="radio" name="src" value="link">🔗 YouTube Video Link</label></div>
+<div id="srcup"><input type="file" id="file" accept="video/*"></div>
+<div id="srclink" hidden><input id="lnk" placeholder="https://youtube.com/..."><div class="note">YouTube link se download browser me nahi ho sakta (YouTube browser ko video file nahi deta). Video phone me save karke Upload Video se chuno.</div></div>
+</div></details>
+
+<details><summary>📝 YouTube Naming</summary><div><label>Video Topic / Main Title</label><input id="topic" value="Kids Fun Video"></div></details>
+
+<details><summary>⚙️ Shorts Settings</summary><div>
+<label>⏱️ Short Duration: <b id="lenv">35</b> sec</label><input type="range" id="len" min="10" max="60" value="35">
+<div class="row"><div><label>Kitne clips</label><select id="n"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option></select></div>
+<div><label>🎞️ Video Quality</label><select id="q"><option value="480">480p - Sabse halka</option><option value="720" selected>720p - Faster</option><option value="1080">1080p - Best (bhari)</option></select></div></div>
+<label>Hisse kaise chune</label><select id="mode"></select>
 <div id="mrow" hidden><label>Start time (sec, comma se: 10,60,120)</label><input id="man" placeholder="10,60,120"></div>
-<label>Video ka format (background)</label><select id="fit"><option value="blur">Blur background + video beech me</option><option value="crop">Poora crop (zoom)</option></select>
+</div></details>
+
+<details><summary>🔍 Main Video Zoom</summary><div><label>Main video kitna zoom ho: <b id="zv">100</b>%</label><input type="range" id="zoom" min="100" max="200" value="100"><div class="note">100% = normal size</div></div></details>
+
+<details><summary>🎨 Editing Style</summary><div><h2 id="sth">🧸 Kids Style</h2><label>Choose Editing Style</label><select id="style"></select></div></details>
+
+<details><summary>✨ Effects</summary><div class="chk">
+<label><input type="checkbox" id="e_blur" checked>🌫️ 70-80% Blur Background</label>
+<label><input type="checkbox" id="e_sharp" checked>✨ Sharpen Main Video</label>
+<label><input type="checkbox" id="e_norm" checked>🔊 Normalize Audio</label>
+<label><input type="checkbox" id="e_topic">📝 Add Topic on Video</label>
+<label><input type="checkbox" id="e_tag" checked>▶️ Add #Shorts to Names</label>
+<label><input type="checkbox" id="e_thumb" checked>🖼️ Create Thumbnails</label></div></details>
+
+<details><summary>📺 YouTube Upload Settings</summary><div>
+<div class="chk"><label><input type="checkbox" id="autoup">🚀 Automatically Upload to YouTube</label></div>
+<div class="warn" id="upwarn" hidden>⚠️ Pehle YouTube connect karo.</div>
+<label>Visibility (Immediate Upload)</label><select id="vis"><option>private</option><option>unlisted</option><option>public</option></select>
+<label>Audience</label><div class="radio"><label><input type="radio" name="aud" value="1" checked>Made for Kids</label><label><input type="radio" name="aud" value="0">Not Made for Kids</label></div>
+<label>YouTube Description</label><textarea id="desc" rows="4"></textarea>
+<label>YouTube Tags</label><input id="tags">
+<div class="chk"><label><input type="checkbox" id="sched">🗓️ Schedule Shorts on YouTube</label></div>
+<div id="schrow" hidden><div class="note">Videos abhi private upload hongi aur set date/time par khud publish hongi.</div>
+<div class="row"><div><label>Part 1 Publish Date</label><input type="date" id="d0"></div><div><label>Time</label><input type="time" id="t0" value="18:00"></div></div>
+<label>Do clips ke beech gap (ghante)</label><input type="number" id="gap" value="24" min="1"></div>
+</div></details>
+
+<div class="card"><h2>Engine</h2>
+<select id="eng"><option value="safe">Phone-safe (kam memory, real-time recording) - phone ke liye</option><option value="ff">Quality (ffmpeg, bhari, laptop ke liye; loud-moment pick yahi me)</option></select>
 <button id="go" disabled>Clips banao</button>
-<progress id="pg" value="0" max="1" hidden></progress><div class="note" id="st">Pehle video chuno.</div></div>
+<progress id="pg" value="0" max="1" hidden></progress><div class="note" id="st">Pehle video upload karo.</div><pre id="log" hidden></pre></div>
 
-<div class="card" id="res" hidden><h2>2. Clips</h2><div id="clips"></div></div>
-
-<div class="card" id="up" hidden><h2>3. YouTube upload plan (schedule)</h2>
-<label>Title (#Shorts auto jud jata hai)</label><input id="title" placeholder="Clip title">
-<label>Description</label><textarea id="desc" rows="3"></textarea>
-<label>Tags (comma se)</label><input id="tags" placeholder="excel, hindi, learning">
-<div class="row"><div><label>Pehli clip ki date</label><input type="date" id="d0"></div><div><label>Time</label><input type="time" id="t0" value="18:00"></div></div>
-<div class="row"><div><label>Do clips ke beech gap (ghante)</label><input type="number" id="gap" value="24" min="1"></div>
-<div><label>Bachon ke liye (Made for Kids)</label><select id="kids"><option value="true">Haan</option><option value="false">Nahi</option></select></div></div>
-<button class="alt" id="plan">Dry run: plan dikhao (kuch upload nahi hoga)</button>
-<pre id="planout" hidden></pre>
-<label>Real upload ke liye Google OAuth Client ID (optional)</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com">
-<button id="real" disabled>YouTube pe upload + schedule (sab clips private + publishAt)</button>
-<div class="note">Dry run kuch bhi YouTube ko nahi bhejta. Real upload tabhi chalega jab Client ID ho aur tum Google me allow karo. Ye hissa abhi sirf code ke level pe hai, live test nahi hua.</div></div>
+<div class="card" id="res" hidden><h2>Clips</h2><div id="clips"></div>
+<button class="alt" id="plan">Plan dikhao (dry run, kuch upload nahi hoga)</button><pre id="planout" hidden></pre>
+<button id="real">YouTube pe upload karo</button></div>
 
 <script src="ffmpeg.js"></script><script src="util.js"></script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script>
-const $=id=>document.getElementById(id);let ff,file,clips=[];
+const $=id=>document.getElementById(id);let ff,file,clips=[],stage="start";
 const say=t=>$("st").textContent=t;
-$("file").onchange=e=>{file=e.target.files[0];$("go").disabled=!file;say(file?file.name+" ("+(file.size/1048576).toFixed(1)+" MB)":"")};
-async function load(){
- if(ff)return;say("Engine load ho raha hai (pehli baar ~30 MB)...");
- ff=new FFmpegWASM.FFmpeg();ff.on("progress",({progress})=>{$("pg").value=Math.min(1,Math.max(0,progress))});
- const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/";
- await ff.load({coreURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.js","text/javascript"),wasmURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.wasm","application/wasm")});
-}
-function pick(e,L,n,mode,D){
- const N=e.length,res=[];
- if(mode==="even"){const step=Math.max(L,Math.floor(D/n));for(let i=0;i<n&&i*step<D-2;i++)res.push(i*step);return res}
- const w=Math.min(L,N),sc=[];let s=0;for(let i=0;i<w;i++)s+=e[i];
- for(let i=0;i+w<=N;i++){if(i>0)s+=e[i+w-1]-e[i-1];sc.push([s,i])}
- sc.sort((a,b)=>b[0]-a[0]);
- for(const[,i]of sc){if(res.every(j=>Math.abs(i-j)>=L))res.push(i);if(res.length>=n)break}
- return res.sort((a,b)=>a-b);
-}
-$("mode").onchange=()=>$("mrow").hidden=$("mode").value!=="manual";
+const CH={
+ kids:{name:"Kids Channel",emoji:"🧸",cat:"24",mfk:true,head:"🧸 Kids Style",styles:[["🌈 Colorful Kids","saturate(1.35) contrast(1.05) brightness(1.04)","eq=saturation=1.35:contrast=1.05:brightness=0.03"],["✨ Cute & Soft","saturate(1.1) brightness(1.08) contrast(.95)","eq=saturation=1.1:contrast=0.95:brightness=0.06"],["🎉 Fun & Energetic","saturate(1.5) contrast(1.15)","eq=saturation=1.5:contrast=1.15"],["🫧 Clean Kids","contrast(1.05) brightness(1.03)","eq=contrast=1.05:brightness=0.02"],["🎬 Minimal","",""]],desc:"{title}\n\nFun kids video.\n\n#Shorts #Kids #Fun",tags:"kids, kids video, kids shorts, fun, shorts"},
+ gaming:{name:"Gaming Channel",emoji:"🎮",cat:"20",mfk:false,head:"🎮 Gaming Style",styles:[["🎮 Gaming Clean","contrast(1.08) saturate(1.15)","eq=contrast=1.08:saturation=1.15"],["⚡ Gaming Fast","contrast(1.15) saturate(1.3) brightness(1.03)","eq=contrast=1.15:saturation=1.3:brightness=0.02"],["🔥 Gaming Highlights","contrast(1.2) saturate(1.45)","eq=contrast=1.2:saturation=1.45"],["🎬 Minimal","",""]],desc:"{title}\n\nGaming short video.\n\n#Shorts #Gaming",tags:"gaming, gaming shorts, gameplay, shorts"},
+ story:{name:"Story Podcast Channel",emoji:"🎙️",cat:"22",mfk:false,head:"🎙️ Story Podcast Style",styles:[["🎙️ Podcast Clean","contrast(1.04)","eq=contrast=1.04"],["📖 Story Cinematic","contrast(1.15) saturate(.85) brightness(.96)","eq=contrast=1.15:saturation=0.85:brightness=-0.02"],["✨ Soft Story","brightness(1.06) saturate(.95) contrast(.97)","eq=brightness=0.04:saturation=0.95:contrast=0.97"],["🎬 Minimal","",""]],desc:"{title}\n\nStory podcast short.\n\n#Shorts #Story #Podcast",tags:"story, podcast, storytelling, shorts"}};
+const ctype=()=>document.querySelector("input[name=ct]:checked").value;
+const SCOPE="https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly";
+const acct={};try{Object.assign(acct,JSON.parse(sessionStorage.getItem("acct")||"{}"))}catch(e){}
+$("cid").value=localStorage.getItem("cid")||"";$("cid").oninput=()=>localStorage.setItem("cid",$("cid").value.trim());
+function drawChs(){$("chs").innerHTML=Object.keys(CH).map(k=>{const a=acct[k],ok=a&&a.exp>Date.now();return `<div class="ch"><span>${CH[k].emoji} ${CH[k].name} - ${ok?"Connected: "+(a.title||"ok"):"Not connected"}</span><button data-c="${k}">Connect</button><button class="alt" data-r="${k}">Refresh</button></div>`}).join("");
+ $("chs").querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>connect(b.dataset.c,"select_account consent"));
+ $("chs").querySelectorAll("button[data-r]").forEach(b=>b.onclick=()=>acct[b.dataset.r]?connect(b.dataset.r,""):connect(b.dataset.r,"select_account consent"));
+ $("upwarn").hidden=!$("autoup").checked||!!(acct[ctype()]&&acct[ctype()].exp>Date.now())}
+function connect(k,prompt){const cid=$("cid").value.trim();const n=$("cnote");
+ if(!cid.includes(".apps.googleusercontent.com")){n.textContent="Pehle upar Google OAuth Client ID paste karo (Google Cloud ka ek baar ka setup baaki hai).";return}
+ if(!window.google||!google.accounts){n.textContent="Google login script load nahi hui, internet check karke dobara try karo.";return}
+ n.textContent=CH[k].name+" connect ho raha hai...";
+ google.accounts.oauth2.initTokenClient({client_id:cid,scope:SCOPE,prompt,callback:async tk=>{
+  if(!tk.access_token){n.textContent="Google ne allow nahi kiya: "+(tk.error||"cancel");return}
+  let title="ok";try{const r=await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",{headers:{Authorization:"Bearer "+tk.access_token}});const j=await r.json();title=(j.items&&j.items[0]&&j.items[0].snippet.title)||"(channel nahi mila)"}catch(e){}
+  acct[k]={token:tk.access_token,exp:Date.now()+(+tk.expires_in||3600)*1000-60000,title};sessionStorage.setItem("acct",JSON.stringify(acct));n.textContent=CH[k].name+" connected: "+title+" (1 ghante valid, phir Refresh)";drawChs()},
+  error_callback:e=>{n.textContent="Connect fail: "+(e&&(e.message||e.type)||"unknown")}}).requestAccessToken()}
+function applyType(){const c=CH[ctype()];$("sth").textContent=c.head;$("style").innerHTML=c.styles.map((s,i)=>`<option value="${i}">${s[0]}</option>`).join("");
+ document.querySelector("input[name=aud][value='"+(c.mfk?1:0)+"']").checked=true;$("desc").value=c.desc;$("tags").value=c.tags;drawChs()}
+document.querySelectorAll("input[name=ct]").forEach(r=>r.onchange=applyType);applyType();
+document.querySelectorAll("input[name=src]").forEach(r=>r.onchange=()=>{const l=document.querySelector("input[name=src]:checked").value==="link";$("srclink").hidden=!l;$("srcup").hidden=l});
+$("autoup").onchange=drawChs;$("len").oninput=()=>$("lenv").textContent=$("len").value;$("zoom").oninput=()=>$("zv").textContent=$("zoom").value;
+$("sched").onchange=()=>$("schrow").hidden=!$("sched").checked;
+function modes(){const ff=$("eng").value==="ff";$("mode").innerHTML=(ff?'<option value="loud">Sabse tez awaaz / josh wale hisse</option>':'')+'<option value="even">Barabar hisso me baantna</option><option value="manual">Mai start time khud daalunga</option>';$("mrow").hidden=$("mode").value!=="manual"}
+$("eng").onchange=modes;$("mode").onchange=()=>$("mrow").hidden=$("mode").value!=="manual";modes();
+$("file").onchange=e=>{file=e.target.files[0];$("go").disabled=!file;say(file?file.name+" ("+(file.size/1048576).toFixed(1)+" MB)":"Pehle video upload karo.")};
+const dd=new Date();dd.setDate(dd.getDate()+1);$("d0").value=dd.toISOString().slice(0,10);
 const errMsg=(e,st)=>"Error ("+st+"): "+((e&&e.message)||(typeof e==="string"?e:"")||"unknown, phone memory kam ho sakti hai. Phone-safe engine try karo");
-let stage="start";
-$("go").onclick=()=>$("eng").value==="safe"?goSafe():goFF();
-async function goFF(){
- $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];
- try{
- stage="engine load";await load();const L=+$("len").value,n=+$("n").value;
- stage="video padhna";say("Video padh raha hu...");await ff.writeFile("in.mp4",await FFmpegUtil.fetchFile(file));
- stage="awaaz check";say("Awaaz check ho rahi hai...");
- await ff.exec(["-i","in.mp4","-vn","-ac","1","-ar","8000","-f","s16le","a.raw"]);
- const raw=await ff.readFile("a.raw");const s16=new Int16Array(raw.buffer,raw.byteOffset,Math.floor(raw.byteLength/2));
- const sec=Math.floor(s16.length/8000),e=new Float32Array(sec);
- for(let i=0;i<sec;i++){let a=0;for(let k=0;k<8000;k++){const v=s16[i*8000+k]/32768;a+=v*v}e[i]=Math.sqrt(a/8000)}
- await ff.deleteFile("a.raw");
- const starts=pick(e,L,n,$("mode").value,sec);
- const vf=$("fit").value==="blur"?"split[a][b];[a]scale=108:192:force_original_aspect_ratio=increase,crop=108:192,boxblur=3:1,scale=720:1280[bg];[b]scale=720:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p":"scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,format=yuv420p";
- const fc=vf.includes("[")?["-filter_complex",vf]:["-vf",vf];
- for(let r=0;r<starts.length;r++){
-  stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
-  const out="clip"+(r+1)+".mp4";
-  await ff.exec(["-ss",""+starts[r],"-t",""+L,"-i","in.mp4",...fc,"-c:v","libx264","-preset","ultrafast","-crf","27","-c:a","aac",out]);
-  const data=await ff.readFile(out);await ff.deleteFile(out);
-  const blob=new Blob([data.buffer],{type:"video/mp4"}),url=URL.createObjectURL(blob);
-  clips.push({name:out,blob,start:starts[r],len:L});
-  $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${out}</b><br>${Math.floor(starts[r]/60)}:${String(starts[r]%60).padStart(2,"0")} se ${L} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${out}">Download</a></div>`);
- }
- await ff.deleteFile("in.mp4");
- $("res").hidden=false;$("up").hidden=false;say("Ho gaya: "+clips.length+" clips ready.");
- }catch(err){say(errMsg(err,stage));console.error(err);ff=null}
- $("go").disabled=false;$("pg").hidden=true;
-}
-
-const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},bad=()=>{cl();rej(new Error("video "+ev+" nahi hua (format phone browser me support nahi?)"))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener("error",bad)};el.addEventListener(ev,ok);el.addEventListener("error",bad)});
-function addClip(name,blob,start,len,ext){const url=URL.createObjectURL(blob);clips.push({name,blob,start,len});
- $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${name}</b><br>${Math.floor(start/60)}:${String(Math.floor(start)%60).padStart(2,"0")} se ${len} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${name}">Download</a></div>`)}
-async function recordClip(url,start,len,fit,onp){
+const opts=()=>{const c=CH[ctype()],s=c.styles[+$("style").value]||c.styles[0],q=+$("q").value,W=q===480?480:q===1080?1080:720,H=Math.round(W*16/9/2)*2;
+ return{W,H,fit:$("e_blur").checked?"blur":"black",zoom:+$("zoom").value/100,filt:s[1],eq:s[2],sharp:$("e_sharp").checked,norm:$("e_norm").checked,topic:$("e_topic").checked?$("topic").value:"",thumb:$("e_thumb").checked,L:+$("len").value,n:+$("n").value,br:q===480?1800000:q===1080?6000000:3000000}};
+function showClip(name,blob,start,len,thumb){const url=URL.createObjectURL(blob);clips.push({name,blob,start,len,thumb});
+ let t="";if(thumb){const tu=URL.createObjectURL(thumb);t=` <a href="${tu}" download="${name}.jpg">Thumbnail</a>`}
+ $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${name}</b><br>${Math.floor(start/60)}:${String(Math.floor(start)%60).padStart(2,"0")} se ${len} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${name}">Download</a>${t}</div>`)}
+const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},bad=()=>{cl();rej(new Error("video "+ev+" nahi hua (format is browser me support nahi?)"))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener("error",bad)};el.addEventListener(ev,ok);el.addEventListener("error",bad)});
+// ---------- phone-safe engine: native video + canvas + MediaRecorder ----------
+async function recordClip(url,start,o,onp){
  const v=document.createElement("video");v.src=url;v.playsInline=true;v.preload="auto";v.setAttribute("playsinline","");
- await once(v,"loadedmetadata");const dur=v.duration;if(start>=dur-1)throw new Error("start time video se bahar hai");len=Math.min(len,Math.floor(dur-start));
+ await once(v,"loadedmetadata");const dur=v.duration;if(!(dur>0)||start>=dur-1)throw new Error("start time video se bahar hai");const len=Math.min(o.L,Math.floor(dur-start));
  v.currentTime=start;await once(v,"seeked");
- const W=720,H=1280,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+ const W=o.W,H=o.H,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
  const t=document.createElement("canvas");t.width=54;t.height=96;const tx=t.getContext("2d");
- const vw=v.videoWidth,vh=v.videoHeight;
- const draw=()=>{
-  if(fit==="blur"){const s=Math.max(54/vw,96/vh),w=vw*s,h=vh*s;tx.drawImage(v,(54-w)/2,(96-h)/2,w,h);x.imageSmoothingEnabled=true;x.drawImage(t,0,0,W,H);const k=W/vw,fh=vh*k;x.drawImage(v,0,(H-fh)/2,W,fh)}
-  else{const s=Math.max(W/vw,H/vh),w=vw*s,h=vh*s;x.drawImage(v,(W-w)/2,(H-h)/2,w,h)}};
- draw();const stream=c.captureStream(30);
- const vs=v.captureStream?v.captureStream():(v.mozCaptureStream?v.mozCaptureStream():null);
- if(vs)vs.getAudioTracks().forEach(tr=>stream.addTrack(tr));
+ const vw=v.videoWidth,vh=v.videoHeight;let thumb=null,thumbBusy=false;
+ const ff=[o.filt,o.sharp?"url(#sharp)":""].filter(Boolean).join(" ")||"none";
+ const draw=()=>{x.filter="none";x.fillStyle="#000";x.fillRect(0,0,W,H);
+  if(o.fit==="blur"){const s=Math.max(54/vw,96/vh),w=vw*s,h=vh*s;tx.drawImage(v,(54-w)/2,(96-h)/2,w,h);x.imageSmoothingEnabled=true;x.drawImage(t,0,0,W,H);x.fillStyle="rgba(0,0,0,.18)";x.fillRect(0,0,W,H)}
+  const k=W/vw*o.zoom,fw=vw*k,fh=vh*k;try{x.filter=ff}catch(e){}x.drawImage(v,(W-fw)/2,(H-fh)/2,fw,fh);x.filter="none";
+  if(o.topic){x.font="bold "+Math.round(W*.07)+"px sans-serif";x.textAlign="center";x.lineWidth=Math.round(W*.012);x.strokeStyle="#000";x.fillStyle="#fff";x.strokeText(o.topic,W/2,H*.09,W*.92);x.fillText(o.topic,W/2,H*.09,W*.92)}};
+ draw();const stream=c.captureStream(30);let ac=null;
+ if(o.norm&&(window.AudioContext||window.webkitAudioContext)){try{ac=new(window.AudioContext||window.webkitAudioContext)();const src=ac.createMediaElementSource(v),cm=ac.createDynamicsCompressor();cm.threshold.value=-30;cm.knee.value=20;cm.ratio.value=6;cm.attack.value=.01;cm.release.value=.25;const g=ac.createGain();g.gain.value=2;const dst=ac.createMediaStreamDestination();src.connect(cm);cm.connect(g);g.connect(dst);dst.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));if(ac.state==="suspended")await ac.resume()}catch(e){ac=null}}
+ if(!ac){const vs=v.captureStream?v.captureStream():(v.mozCaptureStream?v.mozCaptureStream():null);if(vs)vs.getAudioTracks().forEach(tr=>stream.addTrack(tr))}
  const mimes=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
  const mime=mimes.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));if(!mime)throw new Error("is browser me video recording support nahi hai");
- const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3000000,audioBitsPerSecond:128000});
+ const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:o.br,audioBitsPerSecond:128000});
  const parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data)};
  const stopped=new Promise(r=>rec.onstop=r);rec.start(1000);
  try{await v.play()}catch(e){v.muted=true;await v.play()}
- await new Promise((res)=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
-  const tick=()=>{if(done)return;draw();const p=(v.currentTime-start)/len;onp(Math.min(1,p));if(v.currentTime>=start+len||v.ended)fin();else requestAnimationFrame(tick)};
+ await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
+  const tick=()=>{if(done)return;draw();const p=(v.currentTime-start)/len;onp(Math.min(1,p));
+   if(o.thumb&&!thumb&&!thumbBusy&&p>.15){thumbBusy=true;c.toBlob(b=>thumb=b,"image/jpeg",.9)}
+   if(v.currentTime>=start+len||v.ended)fin();else requestAnimationFrame(tick)};
   v.onended=fin;requestAnimationFrame(tick);setTimeout(fin,(len+8)*1000)});
- v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());
- const ext=mime.includes("mp4")?"mp4":"webm";return{blob:new Blob(parts,{type:mime.split(";")[0]}),ext,len,start}}
+ v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());if(ac)try{ac.close()}catch(e){}
+ return{blob:new Blob(parts,{type:mime.split(";")[0]}),ext:mime.includes("mp4")?"mp4":"webm",len,start,thumb}}
 async function goSafe(){
- $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];
- try{
-  stage="video kholna";const L=+$("len").value,n=+$("n").value,url=URL.createObjectURL(file);
-  const probe=document.createElement("video");probe.src=url;probe.preload="metadata";await once(probe,"loadedmetadata");const D=Math.floor(probe.duration);
-  let starts;if($("mode").value==="manual"){starts=$("man").value.split(",").map(x=>+x.trim()).filter(x=>x>=0&&!isNaN(x))}
-  else{const step=Math.max(L,Math.floor(D/n));starts=[];for(let i=0;i<n&&i*step<D-2;i++)starts.push(i*step)}
-  if(!starts.length)throw new Error("start time sahi nahi");
-  for(let r=0;r<starts.length;r++){stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
-   const o=await recordClip(url,starts[r],L,$("fit").value,p=>$("pg").value=p);
-   if(!o.blob.size)throw new Error("clip khali aayi");
-   addClip("clip"+(r+1)+"."+o.ext,o.blob,o.start,o.len,o.ext)}
-  $("res").hidden=false;$("up").hidden=false;say("Ho gaya: "+clips.length+" clips ready (loud-moment pick is engine me nahi, barabar ya manual).");
- }catch(err){say(errMsg(err,stage));console.error(err)}
- $("go").disabled=false;$("pg").hidden=true}
-const d=new Date();d.setDate(d.getDate()+1);$("d0").value=d.toISOString().slice(0,10);
-function plan(){
- const tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value;
- return clips.map((c,i)=>{const at=new Date(t0.getTime()+i*gap*3600e3);
-  return{file:c.name,publishAt:at.toISOString(),local:at.toLocaleString(),body:{snippet:{title:($("title").value||"Clip")+(clips.length>1?" "+(i+1):"")+" #Shorts",description:$("desc").value,tags,categoryId:"27"},status:{privacyStatus:"private",publishAt:at.toISOString(),selfDeclaredMadeForKids:$("kids").value==="true"}}}});
+ const o=opts();stage="video kholna";const url=URL.createObjectURL(file);
+ const probe=document.createElement("video");probe.src=url;probe.preload="metadata";await once(probe,"loadedmetadata");const D=Math.floor(probe.duration);
+ let starts;if($("mode").value==="manual")starts=$("man").value.split(",").map(x=>+x.trim()).filter(x=>x>=0&&!isNaN(x));
+ else{const step=Math.max(o.L,Math.floor(D/o.n));starts=[];for(let i=0;i<o.n&&i*step<D-2;i++)starts.push(i*step)}
+ if(!starts.length)throw new Error("start time sahi nahi");
+ for(let r=0;r<starts.length;r++){stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+o.L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
+  const R=await recordClip(url,starts[r],o,p=>$("pg").value=p);if(!R.blob.size)throw new Error("clip khali aayi");
+  showClip("clip"+(r+1)+"."+R.ext,R.blob,R.start,R.len,R.thumb)}
 }
-$("plan").onclick=()=>{const p=plan();$("planout").hidden=false;$("planout").textContent="DRY RUN, kuch upload nahi hua.\n\n"+p.map(x=>x.file+" -> "+x.local+"\n"+JSON.stringify(x.body,null,1)).join("\n\n")};
-$("cid").oninput=()=>$("real").disabled=!$("cid").value.includes(".apps.googleusercontent.com");
-$("real").onclick=()=>{
- const p=plan();if(!confirm(p.length+" clip(s) YouTube pe upload honge. Pakka?"))return;
- google.accounts.oauth2.initTokenClient({client_id:$("cid").value.trim(),scope:"https://www.googleapis.com/auth/youtube.upload",callback:async tk=>{
-  if(!tk.access_token){say("Google ne allow nahi kiya.");return}
-  for(let i=0;i<p.length;i++){say("Upload "+(i+1)+"/"+p.length+"...");
-   const init=await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",{method:"POST",headers:{Authorization:"Bearer "+tk.access_token,"Content-Type":"application/json","X-Upload-Content-Type":"video/mp4"},body:JSON.stringify(p[i].body)});
-   if(!init.ok){say("Upload error: "+init.status+" "+await init.text());return}
-   const r=await fetch(init.headers.get("Location"),{method:"PUT",headers:{"Content-Type":"video/mp4"},body:clips[i].blob});
-   if(!r.ok){say("Upload error: "+r.status);return}
-  }say("Upload ho gaye, schedule set.")}}).requestAccessToken();
-};
+// ---------- quality engine: ffmpeg.wasm (laptop) ----------
+async function load(){if(ff)return;say("Engine load ho raha hai (pehli baar ~30 MB)...");
+ ff=new FFmpegWASM.FFmpeg();ff.on("progress",({progress})=>{$("pg").value=Math.min(1,Math.max(0,progress))});
+ ff.on("log",({message})=>{const l=$("log");l.hidden=false;l.textContent=(l.textContent+"\n"+message).split("\n").slice(-6).join("\n")});
+ const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/";
+ await ff.load({coreURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.js","text/javascript"),wasmURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.wasm","application/wasm")})}
+function pick(e,L,n,mode,D){const N=e.length,res=[];
+ if(mode!=="loud"){const step=Math.max(L,Math.floor(D/n));for(let i=0;i<n&&i*step<D-2;i++)res.push(i*step);return res}
+ const w=Math.min(L,N),sc=[];let s=0;for(let i=0;i<w;i++)s+=e[i];
+ for(let i=0;i+w<=N;i++){if(i>0)s+=e[i+w-1]-e[i-1];sc.push([s,i])}
+ sc.sort((a,b)=>b[0]-a[0]);for(const[,i]of sc){if(res.every(j=>Math.abs(i-j)>=L))res.push(i);if(res.length>=n)break}return res.sort((a,b)=>a-b)}
+async function goFF(){
+ const o=opts();stage="engine load";await load();
+ stage="video mount";say("Video khol raha hu...");let inp;
+ try{await ff.createDir("/in");await ff.mount("WORKERFS",{files:[file]},"/in");inp="/in/"+file.name}catch(e){stage="video padhna (mount fail: "+((e&&e.message)||e)+")";await ff.writeFile("in.mp4",await FFmpegUtil.fetchFile(file));inp="in.mp4"}
+ let starts;
+ if($("mode").value==="manual")starts=$("man").value.split(",").map(x=>+x.trim()).filter(x=>x>=0&&!isNaN(x));
+ else{stage="awaaz check";say("Awaaz check ho rahi hai...");
+  await ff.exec(["-i",inp,"-vn","-ac","1","-ar","8000","-f","s16le","a.raw"]);
+  const raw=await ff.readFile("a.raw");const s16=new Int16Array(raw.buffer,raw.byteOffset,Math.floor(raw.byteLength/2));
+  const sec=Math.floor(s16.length/8000),e=new Float32Array(sec);
+  for(let i=0;i<sec;i++){let a=0;for(let k=0;k<8000;k++){const v=s16[i*8000+k]/32768;a+=v*v}e[i]=Math.sqrt(a/8000)}
+  await ff.deleteFile("a.raw");starts=pick(e,o.L,o.n,$("mode").value,sec)}
+ const W=o.W,H=o.H,z=o.zoom,fgw=Math.round(W*z/2)*2;
+ const post=[o.eq,o.sharp?"unsharp=5:5:0.8":"","format=yuv420p"].filter(Boolean).join(",");
+ const bg=o.fit==="blur"?`[a]scale=${W/6|0}:${H/6|0}:force_original_aspect_ratio=increase,crop=${W/6|0}:${H/6|0},boxblur=3:1,scale=${W}:${H}[bg]`:`[a]scale=${W}:${H},drawbox=x=0:y=0:w=${W}:h=${H}:t=fill:c=black[bg]`;
+ const fc=`split[a][b];${bg};[b]scale=${fgw}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,${post}`;
+ const af=o.norm?["-af","loudnorm=I=-16:TP=-1.5:LRA=11"]:[];
+ for(let r=0;r<starts.length;r++){stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
+  const out="clip"+(r+1)+".mp4";
+  const code=await ff.exec(["-ss",""+starts[r],"-t",""+o.L,"-i",inp,"-filter_complex",fc,...af,"-c:v","libx264","-preset","ultrafast","-crf","27","-c:a","aac",out]);
+  if(code!==0&&code!==undefined)throw new Error("ffmpeg exit code "+code);
+  const data=await ff.readFile(out);await ff.deleteFile(out);
+  const blob=new Blob([data.buffer],{type:"video/mp4"});let thumb=null;
+  if(o.thumb){try{const vu=URL.createObjectURL(blob),v=document.createElement("video");v.src=vu;v.muted=true;await once(v,"loadedmetadata");v.currentTime=Math.min(3,v.duration/3);await once(v,"seeked");const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage(v,0,0,W,H);thumb=await new Promise(rs=>c.toBlob(rs,"image/jpeg",.9))}catch(e){}}
+  showClip(out,blob,starts[r],o.L,thumb)}
+ try{await ff.unmount("/in")}catch(e){}
+}
+$("go").onclick=async()=>{
+ if(document.querySelector("input[name=src]:checked").value==="link"){say("YouTube link se download browser me nahi hota. Video phone me save karke 'Upload Video' se chuno.");return}
+ $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];$("log").hidden=true;
+ try{if($("eng").value==="safe")await goSafe();else await goFF();
+  $("res").hidden=false;say("Ho gaya: "+clips.length+" clips ready.");
+  if($("autoup").checked){if(!(acct[ctype()]&&acct[ctype()].exp>Date.now()))say("Ho gaya: "+clips.length+" clips ready. Auto upload ke liye pehle YouTube connect karo.");else uploadAll()}
+ }catch(err){say(errMsg(err,stage));console.error(err);ff=null}
+ $("go").disabled=false;$("pg").hidden=true};
+// ---------- upload planner + real upload ----------
+function plan(){const c=CH[ctype()],tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),sch=$("sched").checked,t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value,mfk=document.querySelector("input[name=aud]:checked").value==="1";
+ return clips.map((cl,i)=>{const title=($("topic").value||"Video")+(clips.length>1?" Part "+(i+1):"")+($("e_tag").checked?" #Shorts":"");
+  const status={privacyStatus:sch?"private":$("vis").value,selfDeclaredMadeForKids:mfk};let at=null;if(sch){at=new Date(t0.getTime()+i*gap*3600e3);status.publishAt=at.toISOString()}
+  return{file:cl.name,local:at?at.toLocaleString():"abhi",body:{snippet:{title:title.slice(0,100),description:$("desc").value.replace(/\{title\}/g,title),tags,categoryId:c.cat},status}}})}
+$("plan").onclick=()=>{const p=plan();$("planout").hidden=false;$("planout").textContent="DRY RUN, kuch upload nahi hua.\n\nChannel: "+CH[ctype()].name+"\n\n"+p.map(x=>x.file+" -> "+x.local+"\n"+JSON.stringify(x.body,null,1)).join("\n\n")};
+async function uploadAll(){const k=ctype(),a=acct[k];if(!a||a.exp<=Date.now()){say("Pehle "+CH[k].name+" Connect/Refresh karo.");return}
+ const p=plan();if(!confirm(p.length+" clip(s) '"+a.title+"' ("+CH[k].name+") pe upload honge. Pakka?"))return;
+ for(let i=0;i<p.length;i++){try{say("Upload "+(i+1)+"/"+p.length+"...");
+  const init=await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",{method:"POST",headers:{Authorization:"Bearer "+a.token,"Content-Type":"application/json","X-Upload-Content-Type":clips[i].blob.type||"video/mp4"},body:JSON.stringify(p[i].body)});
+  if(!init.ok){say("Upload error: "+init.status+" "+await init.text());return}
+  const r=await fetch(init.headers.get("Location"),{method:"PUT",headers:{"Content-Type":clips[i].blob.type||"video/mp4"},body:clips[i].blob});
+  if(!r.ok){say("Upload error: "+r.status);return}
+  const j=await r.json();
+  if(clips[i].thumb&&j.id){try{await fetch("https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId="+j.id,{method:"POST",headers:{Authorization:"Bearer "+a.token,"Content-Type":"image/jpeg"},body:clips[i].thumb})}catch(e){}}
+ }catch(e){say(errMsg(e,"upload "+(i+1)));return}}
+ say("Upload ho gaye"+($("sched").checked?", schedule set.":".")+"")}
+$("real").onclick=uploadAll;
 </script></body></html>
