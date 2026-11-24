@@ -24,7 +24,9 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 <input type="file" id="file" accept="video/*">
 <div class="row"><div><label>Clip ki length (sec)</label><select id="len"><option>15</option><option>20</option><option selected>30</option><option>45</option><option>60</option></select></div>
 <div><label>Kitne clips</label><select id="n"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option></select></div></div>
-<label>Hisse kaise chune</label><select id="mode"><option value="loud">Sabse tez awaaz / josh wale hisse</option><option value="even">Barabar hisso me baantna</option></select>
+<label>Engine</label><select id="eng"><option value="safe">Phone-safe (jaldi, kam memory, real-time recording)</option><option value="ff">Quality (ffmpeg, bhari, laptop ke liye)</option></select>
+<label>Hisse kaise chune</label><select id="mode"><option value="loud">Sabse tez awaaz / josh wale hisse</option><option value="even">Barabar hisso me baantna</option><option value="manual">Mai start time khud daalunga</option></select>
+<div id="mrow" hidden><label>Start time (sec, comma se: 10,60,120)</label><input id="man" placeholder="10,60,120"></div>
 <label>Video ka format (background)</label><select id="fit"><option value="blur">Blur background + video beech me</option><option value="crop">Poora crop (zoom)</option></select>
 <button id="go" disabled>Clips banao</button>
 <progress id="pg" value="0" max="1" hidden></progress><div class="note" id="st">Pehle video chuno.</div></div>
@@ -65,12 +67,16 @@ function pick(e,L,n,mode,D){
  for(const[,i]of sc){if(res.every(j=>Math.abs(i-j)>=L))res.push(i);if(res.length>=n)break}
  return res.sort((a,b)=>a-b);
 }
-$("go").onclick=async()=>{
+$("mode").onchange=()=>$("mrow").hidden=$("mode").value!=="manual";
+const errMsg=(e,st)=>"Error ("+st+"): "+((e&&e.message)||(typeof e==="string"?e:"")||"unknown, phone memory kam ho sakti hai. Phone-safe engine try karo");
+let stage="start";
+$("go").onclick=()=>$("eng").value==="safe"?goSafe():goFF();
+async function goFF(){
  $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];
  try{
- await load();const L=+$("len").value,n=+$("n").value;
- say("Video padh raha hu...");await ff.writeFile("in.mp4",await FFmpegUtil.fetchFile(file));
- say("Awaaz check ho rahi hai...");
+ stage="engine load";await load();const L=+$("len").value,n=+$("n").value;
+ stage="video padhna";say("Video padh raha hu...");await ff.writeFile("in.mp4",await FFmpegUtil.fetchFile(file));
+ stage="awaaz check";say("Awaaz check ho rahi hai...");
  await ff.exec(["-i","in.mp4","-vn","-ac","1","-ar","8000","-f","s16le","a.raw"]);
  const raw=await ff.readFile("a.raw");const s16=new Int16Array(raw.buffer,raw.byteOffset,Math.floor(raw.byteLength/2));
  const sec=Math.floor(s16.length/8000),e=new Float32Array(sec);
@@ -80,7 +86,7 @@ $("go").onclick=async()=>{
  const vf=$("fit").value==="blur"?"split[a][b];[a]scale=108:192:force_original_aspect_ratio=increase,crop=108:192,boxblur=3:1,scale=720:1280[bg];[b]scale=720:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p":"scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,format=yuv420p";
  const fc=vf.includes("[")?["-filter_complex",vf]:["-vf",vf];
  for(let r=0;r<starts.length;r++){
-  say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
+  stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
   const out="clip"+(r+1)+".mp4";
   await ff.exec(["-ss",""+starts[r],"-t",""+L,"-i","in.mp4",...fc,"-c:v","libx264","-preset","ultrafast","-crf","27","-c:a","aac",out]);
   const data=await ff.readFile(out);await ff.deleteFile(out);
@@ -90,9 +96,52 @@ $("go").onclick=async()=>{
  }
  await ff.deleteFile("in.mp4");
  $("res").hidden=false;$("up").hidden=false;say("Ho gaya: "+clips.length+" clips ready.");
- }catch(err){say("Error: "+err.message);console.error(err)}
+ }catch(err){say(errMsg(err,stage));console.error(err);ff=null}
  $("go").disabled=false;$("pg").hidden=true;
-};
+}
+
+const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},bad=()=>{cl();rej(new Error("video "+ev+" nahi hua (format phone browser me support nahi?)"))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener("error",bad)};el.addEventListener(ev,ok);el.addEventListener("error",bad)});
+function addClip(name,blob,start,len,ext){const url=URL.createObjectURL(blob);clips.push({name,blob,start,len});
+ $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${name}</b><br>${Math.floor(start/60)}:${String(Math.floor(start)%60).padStart(2,"0")} se ${len} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${name}">Download</a></div>`)}
+async function recordClip(url,start,len,fit,onp){
+ const v=document.createElement("video");v.src=url;v.playsInline=true;v.preload="auto";v.setAttribute("playsinline","");
+ await once(v,"loadedmetadata");const dur=v.duration;if(start>=dur-1)throw new Error("start time video se bahar hai");len=Math.min(len,Math.floor(dur-start));
+ v.currentTime=start;await once(v,"seeked");
+ const W=720,H=1280,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+ const t=document.createElement("canvas");t.width=54;t.height=96;const tx=t.getContext("2d");
+ const vw=v.videoWidth,vh=v.videoHeight;
+ const draw=()=>{
+  if(fit==="blur"){const s=Math.max(54/vw,96/vh),w=vw*s,h=vh*s;tx.drawImage(v,(54-w)/2,(96-h)/2,w,h);x.imageSmoothingEnabled=true;x.drawImage(t,0,0,W,H);const k=W/vw,fh=vh*k;x.drawImage(v,0,(H-fh)/2,W,fh)}
+  else{const s=Math.max(W/vw,H/vh),w=vw*s,h=vh*s;x.drawImage(v,(W-w)/2,(H-h)/2,w,h)}};
+ draw();const stream=c.captureStream(30);
+ const vs=v.captureStream?v.captureStream():(v.mozCaptureStream?v.mozCaptureStream():null);
+ if(vs)vs.getAudioTracks().forEach(tr=>stream.addTrack(tr));
+ const mimes=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
+ const mime=mimes.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));if(!mime)throw new Error("is browser me video recording support nahi hai");
+ const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3000000,audioBitsPerSecond:128000});
+ const parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data)};
+ const stopped=new Promise(r=>rec.onstop=r);rec.start(1000);
+ try{await v.play()}catch(e){v.muted=true;await v.play()}
+ await new Promise((res)=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
+  const tick=()=>{if(done)return;draw();const p=(v.currentTime-start)/len;onp(Math.min(1,p));if(v.currentTime>=start+len||v.ended)fin();else requestAnimationFrame(tick)};
+  v.onended=fin;requestAnimationFrame(tick);setTimeout(fin,(len+8)*1000)});
+ v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());
+ const ext=mime.includes("mp4")?"mp4":"webm";return{blob:new Blob(parts,{type:mime.split(";")[0]}),ext,len,start}}
+async function goSafe(){
+ $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];
+ try{
+  stage="video kholna";const L=+$("len").value,n=+$("n").value,url=URL.createObjectURL(file);
+  const probe=document.createElement("video");probe.src=url;probe.preload="metadata";await once(probe,"loadedmetadata");const D=Math.floor(probe.duration);
+  let starts;if($("mode").value==="manual"){starts=$("man").value.split(",").map(x=>+x.trim()).filter(x=>x>=0&&!isNaN(x))}
+  else{const step=Math.max(L,Math.floor(D/n));starts=[];for(let i=0;i<n&&i*step<D-2;i++)starts.push(i*step)}
+  if(!starts.length)throw new Error("start time sahi nahi");
+  for(let r=0;r<starts.length;r++){stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
+   const o=await recordClip(url,starts[r],L,$("fit").value,p=>$("pg").value=p);
+   if(!o.blob.size)throw new Error("clip khali aayi");
+   addClip("clip"+(r+1)+"."+o.ext,o.blob,o.start,o.len,o.ext)}
+  $("res").hidden=false;$("up").hidden=false;say("Ho gaya: "+clips.length+" clips ready (loud-moment pick is engine me nahi, barabar ya manual).");
+ }catch(err){say(errMsg(err,stage));console.error(err)}
+ $("go").disabled=false;$("pg").hidden=true}
 const d=new Date();d.setDate(d.getDate()+1);$("d0").value=d.toISOString().slice(0,10);
 function plan(){
  const tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value;
