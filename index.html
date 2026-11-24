@@ -122,12 +122,14 @@ const opts=()=>{const c=CH[ctype()],s=c.styles[+$("style").value]||c.styles[0],q
 function showClip(name,blob,start,len,thumb){const url=URL.createObjectURL(blob);clips.push({name,blob,start,len,thumb});
  let t="";if(thumb){const tu=URL.createObjectURL(thumb);t=` <a href="${tu}" download="${name}.jpg">Thumbnail</a>`}
  $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${name}</b><br>${Math.floor(start/60)}:${String(Math.floor(start)%60).padStart(2,"0")} se ${len} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${name}">Download</a>${t}</div>`)}
+const tmo=(p,ms,msg)=>Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error(msg)),ms))]);
+let AC=null;
 const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},bad=()=>{cl();rej(new Error("video "+ev+" nahi hua (format is browser me support nahi?)"))};const cl=()=>{el.removeEventListener(ev,ok);el.removeEventListener("error",bad)};el.addEventListener(ev,ok);el.addEventListener("error",bad)});
 // ---------- phone-safe engine: native video + canvas + MediaRecorder ----------
 async function recordClip(url,start,o,onp){
  const v=document.createElement("video");v.src=url;v.playsInline=true;v.preload="auto";v.setAttribute("playsinline","");
- await once(v,"loadedmetadata");const dur=v.duration;if(!(dur>0)||start>=dur-1)throw new Error("start time video se bahar hai");const len=Math.min(o.L,Math.floor(dur-start));
- v.currentTime=start;await once(v,"seeked");
+ await tmo(once(v,"loadedmetadata"),20000,"video metadata load nahi hua");const dur=v.duration;if(!(dur>0)||start>=dur-1)throw new Error("start time video se bahar hai");const len=Math.min(o.L,Math.floor(dur-start));
+ v.currentTime=start;await tmo(once(v,"seeked"),20000,"video seek nahi hua");
  const W=o.W,H=o.H,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
  const t=document.createElement("canvas");t.width=54;t.height=96;const tx=t.getContext("2d");
  const vw=v.videoWidth,vh=v.videoHeight;let thumb=null,thumbBusy=false;
@@ -137,20 +139,20 @@ async function recordClip(url,start,o,onp){
   const k=W/vw*o.zoom,fw=vw*k,fh=vh*k;try{x.filter=ff}catch(e){}x.drawImage(v,(W-fw)/2,(H-fh)/2,fw,fh);x.filter="none";
   if(o.topic){x.font="bold "+Math.round(W*.07)+"px sans-serif";x.textAlign="center";x.lineWidth=Math.round(W*.012);x.strokeStyle="#000";x.fillStyle="#fff";x.strokeText(o.topic,W/2,H*.09,W*.92);x.fillText(o.topic,W/2,H*.09,W*.92)}};
  draw();const stream=c.captureStream(30);let ac=null;
- if(o.norm&&(window.AudioContext||window.webkitAudioContext)){try{ac=new(window.AudioContext||window.webkitAudioContext)();const src=ac.createMediaElementSource(v),cm=ac.createDynamicsCompressor();cm.threshold.value=-30;cm.knee.value=20;cm.ratio.value=6;cm.attack.value=.01;cm.release.value=.25;const g=ac.createGain();g.gain.value=2;const dst=ac.createMediaStreamDestination();src.connect(cm);cm.connect(g);g.connect(dst);dst.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));if(ac.state==="suspended")await ac.resume()}catch(e){ac=null}}
+ if(o.norm&&AC&&AC.state==="running"){try{ac=AC;const src=ac.createMediaElementSource(v),cm=ac.createDynamicsCompressor();cm.threshold.value=-30;cm.knee.value=20;cm.ratio.value=6;cm.attack.value=.01;cm.release.value=.25;const g=ac.createGain();g.gain.value=2;const dst=ac.createMediaStreamDestination();src.connect(cm);cm.connect(g);g.connect(dst);dst.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));dst._n=1}catch(e){ac=null}}
  if(!ac){const vs=v.captureStream?v.captureStream():(v.mozCaptureStream?v.mozCaptureStream():null);if(vs)vs.getAudioTracks().forEach(tr=>stream.addTrack(tr))}
  const mimes=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
  const mime=mimes.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));if(!mime)throw new Error("is browser me video recording support nahi hai");
  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:o.br,audioBitsPerSecond:128000});
  const parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data)};
  const stopped=new Promise(r=>rec.onstop=r);rec.start(1000);
- try{await v.play()}catch(e){v.muted=true;await v.play()}
+ try{await tmo(v.play(),8000,"play timeout")}catch(e){v.muted=true;await tmo(v.play(),8000,"video play nahi ho paya (browser ne roka)")}
  await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
   const tick=()=>{if(done)return;draw();const p=(v.currentTime-start)/len;onp(Math.min(1,p));
    if(o.thumb&&!thumb&&!thumbBusy&&p>.15){thumbBusy=true;c.toBlob(b=>thumb=b,"image/jpeg",.9)}
    if(v.currentTime>=start+len||v.ended)fin();else requestAnimationFrame(tick)};
   v.onended=fin;requestAnimationFrame(tick);setTimeout(fin,(len+8)*1000)});
- v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());if(ac)try{ac.close()}catch(e){}
+ v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());
  return{blob:new Blob(parts,{type:mime.split(";")[0]}),ext:mime.includes("mp4")?"mp4":"webm",len,start,thumb}}
 async function goSafe(){
  const o=opts();stage="video kholna";const url=URL.createObjectURL(file);
@@ -201,6 +203,7 @@ async function goFF(){
  try{await ff.unmount("/in")}catch(e){}
 }
 $("go").onclick=async()=>{
+ try{const AX=window.AudioContext||window.webkitAudioContext;if(AX&&!AC)AC=new AX();if(AC&&AC.state!=="running")AC.resume().catch(()=>{})}catch(e){AC=null}
  if(document.querySelector("input[name=src]:checked").value==="link"){say("YouTube link se download browser me nahi hota. Video phone me save karke 'Upload Video' se chuno.");return}
  $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];$("log").hidden=true;
  try{if($("eng").value==="safe")await goSafe();else await goFF();
