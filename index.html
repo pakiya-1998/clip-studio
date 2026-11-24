@@ -77,12 +77,12 @@ $("go").onclick=async()=>{
  for(let i=0;i<sec;i++){let a=0;for(let k=0;k<8000;k++){const v=s16[i*8000+k]/32768;a+=v*v}e[i]=Math.sqrt(a/8000)}
  await ff.deleteFile("a.raw");
  const starts=pick(e,L,n,$("mode").value,sec);
- const vf=$("fit").value==="blur"?"split[a][b];[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];[b]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p":"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p";
+ const vf=$("fit").value==="blur"?"split[a][b];[a]scale=108:192:force_original_aspect_ratio=increase,crop=108:192,boxblur=3:1,scale=720:1280[bg];[b]scale=720:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p":"scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,format=yuv420p";
  const fc=vf.includes("[")?["-filter_complex",vf]:["-vf",vf];
  for(let r=0;r<starts.length;r++){
   say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
   const out="clip"+(r+1)+".mp4";
-  await ff.exec(["-ss",""+starts[r],"-t",""+L,"-i","in.mp4",...fc,"-c:v","libx264","-preset","ultrafast","-crf","25","-c:a","aac",out]);
+  await ff.exec(["-ss",""+starts[r],"-t",""+L,"-i","in.mp4",...fc,"-c:v","libx264","-preset","ultrafast","-crf","27","-c:a","aac",out]);
   const data=await ff.readFile(out);await ff.deleteFile(out);
   const blob=new Blob([data.buffer],{type:"video/mp4"}),url=URL.createObjectURL(blob);
   clips.push({name:out,blob,start:starts[r],len:L});
