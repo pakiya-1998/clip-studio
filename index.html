@@ -70,7 +70,7 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 <label>YouTube Tags</label><input id="tags">
 <div class="chk"><label><input type="checkbox" id="testmode">🧪 Test: sirf pehla clip, private upload (schedule nahi)</label></div>
 <div class="chk"><label><input type="checkbox" id="sched">🗓️ Schedule Shorts on YouTube</label></div>
-<div id="schrow" hidden><div class="note">Videos abhi private upload hongi aur set date/time par khud publish hongi.</div>
+<div id="schrow" hidden><div class="note">Ek channel pe ek hi video schedule hoti hai (pehle wali live hone ke baad agli). Tool sirf pehla clip schedule karega aur pehle check karega ki koi schedule pehle se to nahi.</div>
 <div class="row"><div><label>Part 1 Publish Date</label><input type="date" id="d0"></div><div><label>Is channel ka roz ka time (yaad rahega)</label><input type="time" id="t0" value="18:00"></div></div>
 <label>Do clips ke beech gap (ghante, 24 = roz 1 clip)</label><input type="number" id="gap" value="24" min="1"></div>
 </div></details>
@@ -254,15 +254,23 @@ $("go").onclick=async()=>{
  $("go").disabled=false;$("pg").hidden=true};
 // ---------- upload planner + real upload ----------
 function plan(){const c=CH[ctype()],tags0=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),test=$("testmode").checked,sch=$("sched").checked&&!test,t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value,mfk=document.querySelector("input[name=aud]:checked").value==="1";
- const list=test?clips.slice(0,1):clips;
+ const list=(test||sch)?clips.slice(0,1):clips;
  return list.map((cl,i)=>{let title=cl.meta?cl.meta.title:($("topic").value||"Video")+(clips.length>1?" Part "+(i+1):"");if($("e_tag").checked&&!/#shorts/i.test(title))title=title.slice(0,90)+" #Shorts";
   const status={privacyStatus:test?"private":sch?"private":$("vis").value,selfDeclaredMadeForKids:mfk};let at=null;if(sch){at=new Date(t0.getTime()+i*gap*3600e3);status.publishAt=at.toISOString()}
   const tags=[...new Set([...tags0,...(cl.meta?cl.meta.kw:[])])].slice(0,15);
   const desc=$("desc").value.replace(/\{title\}/g,title)+(cl.meta&&cl.meta.desc?"\n\n"+cl.meta.desc:"");
   return{idx:i,file:cl.name,local:at?at.toLocaleString():(test?"abhi (private test)":"abhi"),body:{snippet:{title:title.slice(0,100),description:desc,tags,categoryId:c.cat},status}}})}
 $("plan").onclick=()=>{const p=plan();$("planout").hidden=false;$("planout").textContent="DRY RUN, kuch upload nahi hua.\n\nChannel: "+CH[ctype()].name+"\n\n"+p.map(x=>x.file+" -> "+x.local+"\n"+JSON.stringify(x.body,null,1)).join("\n\n")};
+async function pendingScheduled(token){const H={Authorization:"Bearer "+token};
+ const j=async u=>{const r=await fetch(u,{headers:H});if(!r.ok)throw new Error("YouTube check fail "+r.status);return r.json()};
+ const ch=await j("https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true");const up=ch.items&&ch.items[0]&&ch.items[0].contentDetails.relatedPlaylists.uploads;if(!up)throw new Error("channel uploads list nahi mili");
+ const pl=await j("https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId="+up);const ids=(pl.items||[]).map(i=>i.contentDetails.videoId);if(!ids.length)return[];
+ const vs=await j("https://www.googleapis.com/youtube/v3/videos?part=status,snippet&id="+ids.join(","));
+ return(vs.items||[]).filter(v=>v.status&&v.status.publishAt&&new Date(v.status.publishAt).getTime()>Date.now()&&v.status.privacyStatus==="private").map(v=>({id:v.id,title:v.snippet.title,at:v.status.publishAt}))}
 async function uploadAll(){const k=ctype(),a=acct[k];if(!a||a.exp<=Date.now()){say("Pehle "+CH[k].name+" Connect/Refresh karo.");return}
- const p=plan();if(!confirm(p.length+" clip(s) '"+a.title+"' ("+CH[k].name+") pe upload honge. Pakka?"))return;
+ const p=plan();
+ if($("sched").checked&&!$("testmode").checked){try{const pend=await pendingScheduled(a.token);if(pend.length){say("Rok diya: is channel pe pehle se ek video schedule hai ('"+pend[0].title+"', "+new Date(pend[0].at).toLocaleString()+"). Wo live ho jaye tab agla schedule karo. Kuch upload nahi hua.");return}}catch(e){say("Rok diya: schedule check nahi ho paya ("+((e&&e.message)||e)+"). Safety ke liye kuch upload nahi hua.");return}}
+ if(!confirm(p.length+" clip(s) '"+a.title+"' ("+CH[k].name+") pe upload honge. Pakka?"))return;
  for(let i=0;i<p.length;i++){try{say("Upload "+(i+1)+"/"+p.length+"...");
   const init=await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",{method:"POST",headers:{Authorization:"Bearer "+a.token,"Content-Type":"application/json","X-Upload-Content-Type":clips[i].blob.type||"video/mp4"},body:JSON.stringify(p[i].body)});
   if(!init.ok){say("Upload error: "+init.status+" "+await init.text());return}
@@ -271,6 +279,6 @@ async function uploadAll(){const k=ctype(),a=acct[k];if(!a||a.exp<=Date.now()){s
   const j=await r.json();
   if(clips[i].thumb&&j.id){try{await fetch("https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId="+j.id,{method:"POST",headers:{Authorization:"Bearer "+a.token,"Content-Type":"image/jpeg"},body:clips[i].thumb})}catch(e){}}
  }catch(e){say(errMsg(e,"upload "+(i+1)));return}}
- say("Upload ho gaye"+($("sched").checked?", schedule set.":".")+"")}
+ say("Upload ho gaye"+($("sched").checked&&!$("testmode").checked?", schedule set (sirf 1 clip; baaki clips download karke rakho, agla live hone ke baad).":"."))}
 $("real").onclick=uploadAll;
 </script></body></html>
