@@ -92,7 +92,7 @@ const CH={
 const ctype=()=>document.querySelector("input[name=ct]:checked").value;
 const SCOPE="https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly";
 const acct={};try{Object.assign(acct,JSON.parse(sessionStorage.getItem("acct")||"{}"))}catch(e){}
-$("cid").value=localStorage.getItem("cid")||"";$("cid").oninput=()=>localStorage.setItem("cid",$("cid").value.trim());
+$("cid").value=localStorage.getItem("cid")||"739416210902-45749ju9meu47gqq5u6c7lt7kvjlq3hc.apps.googleusercontent.com";$("cid").oninput=()=>localStorage.setItem("cid",$("cid").value.trim());
 function drawChs(){$("chs").innerHTML=Object.keys(CH).map(k=>{const a=acct[k],ok=a&&a.exp>Date.now();return `<div class="ch"><span>${CH[k].emoji} ${CH[k].name} - ${ok?"Connected: "+(a.title||"ok"):"Not connected"}</span><button data-c="${k}">Connect</button><button class="alt" data-r="${k}">Refresh</button></div>`}).join("");
  $("chs").querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>connect(b.dataset.c,"select_account consent"));
  $("chs").querySelectorAll("button[data-r]").forEach(b=>b.onclick=()=>acct[b.dataset.r]?connect(b.dataset.r,""):connect(b.dataset.r,"select_account consent"));
