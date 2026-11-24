@@ -40,7 +40,7 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 
 <details><summary>⚙️ Shorts Settings</summary><div>
 <label>⏱️ Short Duration: <b id="lenv">35</b> sec</label><input type="range" id="len" min="10" max="60" value="35">
-<div class="row"><div><label>Kitne clips</label><select id="n"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option></select></div>
+<div class="row"><div><label>Kitne clips</label><select id="n"><option>1</option><option>3</option><option>5</option><option selected>6</option><option>8</option><option>10</option></select></div>
 <div><label>🎞️ Video Quality</label><select id="q"><option value="480">480p - Sabse halka</option><option value="720" selected>720p - Faster</option><option value="1080">1080p - Best (bhari)</option></select></div></div>
 <label>Hisse kaise chune</label><select id="mode"></select>
 <div id="mrow" hidden><label>Start time (sec, comma se: 10,60,120)</label><input id="man" placeholder="10,60,120"></div>
@@ -54,6 +54,8 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 <label><input type="checkbox" id="e_blur" checked>🌫️ 70-80% Blur Background</label>
 <label><input type="checkbox" id="e_sharp" checked>✨ Sharpen Main Video</label>
 <label><input type="checkbox" id="e_norm" checked>🔊 Normalize Audio</label>
+<label><input type="checkbox" id="e_cap">💬 Hindi Captions (free AI, phone me pehli baar ~80 MB download, galtiyan ho sakti hain)</label>
+<label><input type="checkbox" id="e_auto" checked>🧠 Har clip ka auto title / description / tags</label>
 <label><input type="checkbox" id="e_topic">📝 Add Topic on Video</label>
 <label><input type="checkbox" id="e_tag" checked>▶️ Add #Shorts to Names</label>
 <label><input type="checkbox" id="e_thumb" checked>🖼️ Create Thumbnails</label></div></details>
@@ -65,10 +67,11 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 <label>Audience</label><div class="radio"><label><input type="radio" name="aud" value="1" checked>Made for Kids</label><label><input type="radio" name="aud" value="0">Not Made for Kids</label></div>
 <label>YouTube Description</label><textarea id="desc" rows="4"></textarea>
 <label>YouTube Tags</label><input id="tags">
+<div class="chk"><label><input type="checkbox" id="testmode">🧪 Test: sirf pehla clip, private upload (schedule nahi)</label></div>
 <div class="chk"><label><input type="checkbox" id="sched">🗓️ Schedule Shorts on YouTube</label></div>
 <div id="schrow" hidden><div class="note">Videos abhi private upload hongi aur set date/time par khud publish hongi.</div>
-<div class="row"><div><label>Part 1 Publish Date</label><input type="date" id="d0"></div><div><label>Time</label><input type="time" id="t0" value="18:00"></div></div>
-<label>Do clips ke beech gap (ghante)</label><input type="number" id="gap" value="24" min="1"></div>
+<div class="row"><div><label>Part 1 Publish Date</label><input type="date" id="d0"></div><div><label>Is channel ka roz ka time (yaad rahega)</label><input type="time" id="t0" value="18:00"></div></div>
+<label>Do clips ke beech gap (ghante, 24 = roz 1 clip)</label><input type="number" id="gap" value="24" min="1"></div>
 </div></details>
 
 <div class="card"><h2>Engine</h2>
@@ -112,10 +115,35 @@ document.querySelectorAll("input[name=ct]").forEach(r=>r.onchange=applyType);app
 document.querySelectorAll("input[name=src]").forEach(r=>r.onchange=()=>{const l=document.querySelector("input[name=src]:checked").value==="link";$("srclink").hidden=!l;$("srcup").hidden=l});
 $("autoup").onchange=drawChs;$("len").oninput=()=>$("lenv").textContent=$("len").value;$("zoom").oninput=()=>$("zv").textContent=$("zoom").value;
 $("sched").onchange=()=>$("schrow").hidden=!$("sched").checked;
-function modes(){const ff=$("eng").value==="ff";$("mode").innerHTML=(ff?'<option value="loud">Sabse tez awaaz / josh wale hisse</option>':'')+'<option value="even">Barabar hisso me baantna</option><option value="manual">Mai start time khud daalunga</option>';$("mrow").hidden=$("mode").value!=="manual"}
+
+function bigText(g,text,W,fs,yEnd,color,maxLines){g.font="bold "+Math.round(fs)+"px sans-serif";g.textAlign="center";g.lineJoin="round";g.lineWidth=Math.round(fs*.2);g.strokeStyle="#000";g.fillStyle=color;
+ const words=text.split(/\s+/),lines=[];let cur="";for(const w of words){const t=cur?cur+" "+w:w;if(g.measureText(t).width>W*.9&&cur){lines.push(cur);cur=w}else cur=t}if(cur)lines.push(cur);
+ const L=lines.slice(0,maxLines||3);let y=yEnd-(L.length-1)*fs*1.15;for(const l of L){g.strokeText(l,W/2,y,W*.94);g.fillText(l,W/2,y,W*.94);y+=fs*1.15}}
+async function decodeAudio(f,D){if(f.size>350e6||D>2400)throw new Error("video bahut badi (350 MB ya 40 min se zyada)");
+ const OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;const ctx=new OC(1,16000,16000);const b=await ctx.decodeAudioData(await f.arrayBuffer());
+ const n=b.length,ch=b.numberOfChannels,data=new Float32Array(n);for(let c=0;c<ch;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)data[i]+=d[i]/ch}
+ const secs=Math.floor(n/16000),e=new Array(secs);for(let k=0;k<secs;k++){let a=0;for(let i=k*16000;i<(k+1)*16000;i++)a+=data[i]*data[i];e[k]=Math.sqrt(a/16000)}return{data,e}}
+let wk=null,wid=0;const wres={};
+const WSRC='import {pipeline,env} from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js";env.allowLocalModels=false;env.backends.onnx.wasm.proxy=false;let asr;onmessage=async e=>{const m=e.data;try{if(!asr){asr=await pipeline("automatic-speech-recognition","Xenova/whisper-base",{progress_callback:p=>postMessage({prog:p})})}const r=await asr(m.audio,{language:"hindi",task:"transcribe",chunk_length_s:30,return_timestamps:true});postMessage({id:m.id,r})}catch(err){postMessage({id:m.id,err:String((err&&err.message)||err)})}};';
+function getWk(){if(wk)return wk;wk=new Worker(URL.createObjectURL(new Blob([WSRC],{type:"text/javascript"})),{type:"module"});
+ wk.onmessage=e=>{const m=e.data;if(m.prog){if(m.prog.status==="progress")say("Caption AI download: "+Math.round(m.prog.progress)+"% (pehli baar ~80 MB)");return}const f=wres[m.id];if(f){delete wres[m.id];m.err?f.rej(new Error(m.err)):f.res(m.r)}};
+ wk.onerror=e=>{const msg=new Error("caption AI load nahi hua ("+(e.message||"worker")+")");Object.keys(wres).forEach(k=>{wres[k].rej(msg);delete wres[k]});wk=null};return wk}
+async function transcribe(data,s,len){const w=getWk();const sl=data.slice(Math.floor(s*16000),Math.floor((s+len)*16000));const id=++wid;
+ const r=await tmo(new Promise((res,rej)=>{wres[id]={res,rej};w.postMessage({id,audio:sl},[sl.buffer])}),600000,"caption AI time-out");
+ const caps=(r.chunks||[]).map(c=>({s:c.timestamp[0]||0,e:c.timestamp[1]==null?len:c.timestamp[1],t:(c.text||"").trim()})).filter(c=>c.t&&c.t.length>1);
+ return{text:(r.text||"").trim(),caps}}
+function metaOf(text,i,n){const base=$("topic").value.trim();const words=text.replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean);const head=words.slice(0,7).join(" ");
+ const fr={};words.filter(w=>w.length>3).forEach(w=>fr[w]=(fr[w]||0)+1);const kw=Object.entries(fr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]);
+ let title=head?(base?base+" | "+head:head):(base||"Video")+(n>1?" Part "+(i+1):"");return{title:title.slice(0,80),desc:text.slice(0,220),kw,head:head||base||"Video"}}
+function loadSlot(){let S={};try{S=JSON.parse(localStorage.getItem("slots")||"{}")}catch(e){}$("t0").value=S[ctype()]||"18:00";
+ const [h,m]=$("t0").value.split(":").map(Number),n=new Date(),t=new Date();t.setHours(h,m,0,0);const d=new Date(t.getTime()<n.getTime()+15*60000?t.getTime()+864e5:t.getTime());
+ $("d0").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+$("t0").onchange=()=>{let S={};try{S=JSON.parse(localStorage.getItem("slots")||"{}")}catch(e){}S[ctype()]=$("t0").value;localStorage.setItem("slots",JSON.stringify(S))};
+document.querySelectorAll("input[name=ct]").forEach(r=>r.addEventListener("change",loadSlot));
+function modes(){const ff=$("eng").value==="ff";$("mode").innerHTML='<option value="loud">Sabse tez awaaz / josh wale hisse (auto)</option>'+'<option value="even">Barabar hisso me baantna</option><option value="manual">Mai start time khud daalunga</option>';$("mrow").hidden=$("mode").value!=="manual"}
 $("eng").onchange=modes;$("mode").onchange=()=>$("mrow").hidden=$("mode").value!=="manual";modes();
 $("file").onchange=e=>{file=e.target.files[0];$("go").disabled=!file;say(file?file.name+" ("+(file.size/1048576).toFixed(1)+" MB)":"Pehle video upload karo.")};
-const dd=new Date();dd.setDate(dd.getDate()+1);$("d0").value=dd.toISOString().slice(0,10);
+loadSlot();
 const errMsg=(e,st)=>"Error ("+st+"): "+((e&&e.message)||(typeof e==="string"?e:"")||"unknown, phone memory kam ho sakti hai. Phone-safe engine try karo");
 const opts=()=>{const c=CH[ctype()],s=c.styles[+$("style").value]||c.styles[0],q=+$("q").value,W=q===480?480:q===1080?1080:720,H=Math.round(W*16/9/2)*2;
  return{W,H,fit:$("e_blur").checked?"blur":"black",zoom:+$("zoom").value/100,filt:s[1],eq:s[2],sharp:$("e_sharp").checked,norm:$("e_norm").checked,topic:$("e_topic").checked?$("topic").value:"",thumb:$("e_thumb").checked,L:+$("len").value,n:+$("n").value,br:q===480?1800000:q===1080?6000000:3000000}};
@@ -141,6 +169,7 @@ async function recordClip(url,start,o,onp){
  draw();const stream=c.captureStream(30);let ac=null;
  if(o.norm&&AC&&AC.state==="running"){try{ac=AC;const src=ac.createMediaElementSource(v),cm=ac.createDynamicsCompressor();cm.threshold.value=-30;cm.knee.value=20;cm.ratio.value=6;cm.attack.value=.01;cm.release.value=.25;const g=ac.createGain();g.gain.value=2;const dst=ac.createMediaStreamDestination();src.connect(cm);cm.connect(g);g.connect(dst);dst.stream.getAudioTracks().forEach(tr=>stream.addTrack(tr));dst._n=1}catch(e){ac=null}}
  if(!ac){const vs=v.captureStream?v.captureStream():(v.mozCaptureStream?v.mozCaptureStream():null);if(vs)vs.getAudioTracks().forEach(tr=>stream.addTrack(tr))}
+ const cap=()=>{if(!o.caps||!o.caps.length)return;const tt=v.currentTime-start,c=o.caps.find(c=>tt>=c.s&&tt<=c.e+.3);if(c)bigText(x,c.t,W,W*.07,H*.8,"#fff",3)};
  const mimes=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
  const mime=mimes.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));if(!mime)throw new Error("is browser me video recording support nahi hai");
  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:o.br,audioBitsPerSecond:128000});
@@ -148,8 +177,8 @@ async function recordClip(url,start,o,onp){
  const stopped=new Promise(r=>rec.onstop=r);rec.start(1000);
  try{await tmo(v.play(),8000,"play timeout")}catch(e){v.muted=true;await tmo(v.play(),8000,"video play nahi ho paya (browser ne roka)")}
  await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
-  const tick=()=>{if(done)return;draw();const p=(v.currentTime-start)/len;onp(Math.min(1,p));
-   if(o.thumb&&!thumb&&!thumbBusy&&p>.15){thumbBusy=true;c.toBlob(b=>thumb=b,"image/jpeg",.9)}
+  const tick=()=>{if(done)return;draw();cap();const p=(v.currentTime-start)/len;onp(Math.min(1,p));
+   if(o.thumb&&!thumb&&!thumbBusy&&p>.15){thumbBusy=true;{const tc=document.createElement("canvas");tc.width=W;tc.height=H;const g=tc.getContext("2d");g.drawImage(c,0,0);if(o.thumbText)bigText(g,o.thumbText.split(/\s+/).slice(0,5).join(" "),W,W*.11,H*.2,"#ffe14d",3);tc.toBlob(b=>thumb=b,"image/jpeg",.9)}}
    if(v.currentTime>=start+len||v.ended)fin();else requestAnimationFrame(tick)};
   v.onended=fin;requestAnimationFrame(tick);setTimeout(fin,(len+8)*1000)});
  v.pause();rec.stop();await stopped;stream.getTracks().forEach(tr=>tr.stop());
@@ -157,12 +186,19 @@ async function recordClip(url,start,o,onp){
 async function goSafe(){
  const o=opts();stage="video kholna";const url=URL.createObjectURL(file);
  const probe=document.createElement("video");probe.src=url;probe.preload="metadata";await once(probe,"loadedmetadata");const D=Math.floor(probe.duration);
+ const wantCap=$("e_cap").checked,wantAuto=$("e_auto").checked;let au=null;
+ if($("mode").value==="loud"||wantCap||wantAuto){stage="awaaz padhna";say("Awaaz analyse ho rahi hai...");try{au=await decodeAudio(file,D)}catch(e){say("Awaaz analyse nahi ho payi ("+((e&&e.message)||e)+"). Barabar split, bina captions.");await new Promise(r=>setTimeout(r,2500))}}
  let starts;if($("mode").value==="manual")starts=$("man").value.split(",").map(x=>+x.trim()).filter(x=>x>=0&&!isNaN(x));
+ else if($("mode").value==="loud"&&au)starts=pick(au.e,o.L,o.n,"loud",D);
  else{const step=Math.max(o.L,Math.floor(D/o.n));starts=[];for(let i=0;i<o.n&&i*step<D-2;i++)starts.push(i*step)}
  if(!starts.length)throw new Error("start time sahi nahi");
- for(let r=0;r<starts.length;r++){stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+o.L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
-  const R=await recordClip(url,starts[r],o,p=>$("pg").value=p);if(!R.blob.size)throw new Error("clip khali aayi");
-  showClip("clip"+(r+1)+"."+R.ext,R.blob,R.start,R.len,R.thumb)}
+ for(let r=0;r<starts.length;r++){let oc={...o},tr={text:"",caps:[]};
+  if(au&&(wantCap||wantAuto)){stage="clip "+(r+1)+" captions";say("Clip "+(r+1)+"/"+starts.length+" ki awaaz sun raha hu (Hindi captions)...");try{tr=await transcribe(au.data,starts[r],o.L)}catch(e){console.error(e);say("Captions nahi ban paye ("+((e&&e.message)||e)+"), bina captions aage badh raha hu.");await new Promise(q=>setTimeout(q,2000))}}
+  const m=metaOf(tr.text,r,starts.length);oc.caps=wantCap?tr.caps:[];oc.thumbText=wantAuto&&tr.text?m.head:($("topic").value||"");
+  stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+o.L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
+  const R=await recordClip(url,starts[r],oc,p=>$("pg").value=p);if(!R.blob.size)throw new Error("clip khali aayi");
+  showClip("clip"+(r+1)+"."+R.ext,R.blob,R.start,R.len,R.thumb);const cl=clips[clips.length-1];cl.meta=wantAuto?m:null;
+  if(cl.meta){const inp=document.createElement("input");inp.value=m.title;inp.oninput=()=>cl.meta.title=inp.value;$("clips").lastElementChild.appendChild(inp)}}
 }
 // ---------- quality engine: ffmpeg.wasm (laptop) ----------
 async function load(){if(ff)return;say("Engine load ho raha hai (pehli baar ~30 MB)...");
@@ -212,10 +248,13 @@ $("go").onclick=async()=>{
  }catch(err){say(errMsg(err,stage));console.error(err);ff=null}
  $("go").disabled=false;$("pg").hidden=true};
 // ---------- upload planner + real upload ----------
-function plan(){const c=CH[ctype()],tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),sch=$("sched").checked,t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value,mfk=document.querySelector("input[name=aud]:checked").value==="1";
- return clips.map((cl,i)=>{const title=($("topic").value||"Video")+(clips.length>1?" Part "+(i+1):"")+($("e_tag").checked?" #Shorts":"");
-  const status={privacyStatus:sch?"private":$("vis").value,selfDeclaredMadeForKids:mfk};let at=null;if(sch){at=new Date(t0.getTime()+i*gap*3600e3);status.publishAt=at.toISOString()}
-  return{file:cl.name,local:at?at.toLocaleString():"abhi",body:{snippet:{title:title.slice(0,100),description:$("desc").value.replace(/\{title\}/g,title),tags,categoryId:c.cat},status}}})}
+function plan(){const c=CH[ctype()],tags0=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),test=$("testmode").checked,sch=$("sched").checked&&!test,t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value,mfk=document.querySelector("input[name=aud]:checked").value==="1";
+ const list=test?clips.slice(0,1):clips;
+ return list.map((cl,i)=>{let title=cl.meta?cl.meta.title:($("topic").value||"Video")+(clips.length>1?" Part "+(i+1):"");if($("e_tag").checked&&!/#shorts/i.test(title))title=title.slice(0,90)+" #Shorts";
+  const status={privacyStatus:test?"private":sch?"private":$("vis").value,selfDeclaredMadeForKids:mfk};let at=null;if(sch){at=new Date(t0.getTime()+i*gap*3600e3);status.publishAt=at.toISOString()}
+  const tags=[...new Set([...tags0,...(cl.meta?cl.meta.kw:[])])].slice(0,15);
+  const desc=$("desc").value.replace(/\{title\}/g,title)+(cl.meta&&cl.meta.desc?"\n\n"+cl.meta.desc:"");
+  return{idx:i,file:cl.name,local:at?at.toLocaleString():(test?"abhi (private test)":"abhi"),body:{snippet:{title:title.slice(0,100),description:desc,tags,categoryId:c.cat},status}}})}
 $("plan").onclick=()=>{const p=plan();$("planout").hidden=false;$("planout").textContent="DRY RUN, kuch upload nahi hua.\n\nChannel: "+CH[ctype()].name+"\n\n"+p.map(x=>x.file+" -> "+x.local+"\n"+JSON.stringify(x.body,null,1)).join("\n\n")};
 async function uploadAll(){const k=ctype(),a=acct[k];if(!a||a.exp<=Date.now()){say("Pehle "+CH[k].name+" Connect/Refresh karo.");return}
  const p=plan();if(!confirm(p.length+" clip(s) '"+a.title+"' ("+CH[k].name+") pe upload honge. Pakka?"))return;
