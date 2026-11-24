@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto Clip Studio</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#0f1115;color:#e8eaf0;padding:16px;max-width:880px;margin:auto}
+h1{font-size:22px;margin:6px 0}h2{font-size:16px;margin:0 0 10px;color:#9ecbff}
+.card{background:#181b22;border:1px solid #262b36;border-radius:12px;padding:14px;margin:12px 0}
+label{display:block;font-size:13px;color:#aab;margin:8px 0 3px}
+input,select,textarea,button{width:100%;padding:10px;border-radius:8px;border:1px solid #333a48;background:#10131a;color:#fff;font-size:15px}
+button{background:#2f6df6;border:0;font-weight:600;cursor:pointer;margin-top:10px}button:disabled{opacity:.45;cursor:default}
+button.alt{background:#2a3142}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.clip{display:flex;gap:10px;align-items:center;border-top:1px solid #262b36;padding:10px 0}
+.clip video{width:90px;border-radius:6px;background:#000}.clip .m{flex:1;font-size:13px}
+.clip a{width:auto;padding:8px 12px;background:#2a3142;color:#fff;border-radius:8px;text-decoration:none;font-size:13px}
+pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-size:12px;max-height:220px;overflow:auto}
+.note{font-size:12px;color:#8a93a6}progress{width:100%}
+</style></head><body>
+<h1>Auto Clip Studio</h1>
+<div class="note">Lamba video chuno, ye khud best hisse dhundh ke vertical 9:16 clips banata hai. Sab kuch tumhare browser me hota hai, video kahin upload nahi hota. Free, sleep mode nahi.</div>
+
+<div class="card"><h2>1. Video</h2>
+<input type="file" id="file" accept="video/*">
+<div class="row"><div><label>Clip ki length (sec)</label><select id="len"><option>15</option><option>20</option><option selected>30</option><option>45</option><option>60</option></select></div>
+<div><label>Kitne clips</label><select id="n"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option></select></div></div>
+<label>Hisse kaise chune</label><select id="mode"><option value="loud">Sabse tez awaaz / josh wale hisse</option><option value="even">Barabar hisso me baantna</option></select>
+<label>Video ka format (background)</label><select id="fit"><option value="blur">Blur background + video beech me</option><option value="crop">Poora crop (zoom)</option></select>
+<button id="go" disabled>Clips banao</button>
+<progress id="pg" value="0" max="1" hidden></progress><div class="note" id="st">Pehle video chuno.</div></div>
+
+<div class="card" id="res" hidden><h2>2. Clips</h2><div id="clips"></div></div>
+
+<div class="card" id="up" hidden><h2>3. YouTube upload plan (schedule)</h2>
+<label>Title (#Shorts auto jud jata hai)</label><input id="title" placeholder="Clip title">
+<label>Description</label><textarea id="desc" rows="3"></textarea>
+<label>Tags (comma se)</label><input id="tags" placeholder="excel, hindi, learning">
+<div class="row"><div><label>Pehli clip ki date</label><input type="date" id="d0"></div><div><label>Time</label><input type="time" id="t0" value="18:00"></div></div>
+<div class="row"><div><label>Do clips ke beech gap (ghante)</label><input type="number" id="gap" value="24" min="1"></div>
+<div><label>Bachon ke liye (Made for Kids)</label><select id="kids"><option value="true">Haan</option><option value="false">Nahi</option></select></div></div>
+<button class="alt" id="plan">Dry run: plan dikhao (kuch upload nahi hoga)</button>
+<pre id="planout" hidden></pre>
+<label>Real upload ke liye Google OAuth Client ID (optional)</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com">
+<button id="real" disabled>YouTube pe upload + schedule (sab clips private + publishAt)</button>
+<div class="note">Dry run kuch bhi YouTube ko nahi bhejta. Real upload tabhi chalega jab Client ID ho aur tum Google me allow karo. Ye hissa abhi sirf code ke level pe hai, live test nahi hua.</div></div>
+
+<script src="ffmpeg.js"></script><script src="util.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const $=id=>document.getElementById(id);let ff,file,clips=[];
+const say=t=>$("st").textContent=t;
+$("file").onchange=e=>{file=e.target.files[0];$("go").disabled=!file;say(file?file.name+" ("+(file.size/1048576).toFixed(1)+" MB)":"")};
+async function load(){
+ if(ff)return;say("Engine load ho raha hai (pehli baar ~30 MB)...");
+ ff=new FFmpegWASM.FFmpeg();ff.on("progress",({progress})=>{$("pg").value=Math.min(1,Math.max(0,progress))});
+ const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/";
+ await ff.load({coreURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.js","text/javascript"),wasmURL:await FFmpegUtil.toBlobURL(base+"ffmpeg-core.wasm","application/wasm")});
+}
+function pick(e,L,n,mode,D){
+ const N=e.length,res=[];
+ if(mode==="even"){const step=Math.max(L,Math.floor(D/n));for(let i=0;i<n&&i*step<D-2;i++)res.push(i*step);return res}
+ const w=Math.min(L,N),sc=[];let s=0;for(let i=0;i<w;i++)s+=e[i];
+ for(let i=0;i+w<=N;i++){if(i>0)s+=e[i+w-1]-e[i-1];sc.push([s,i])}
+ sc.sort((a,b)=>b[0]-a[0]);
+ for(const[,i]of sc){if(res.every(j=>Math.abs(i-j)>=L))res.push(i);if(res.length>=n)break}
+ return res.sort((a,b)=>a-b);
+}
+$("go").onclick=async()=>{
+ $("go").disabled=true;$("pg").hidden=false;$("clips").innerHTML="";clips=[];
+ try{
+ await load();const L=+$("len").value,n=+$("n").value;
+ say("Video padh raha hu...");await ff.writeFile("in.mp4",await FFmpegUtil.fetchFile(file));
+ say("Awaaz check ho rahi hai...");
+ await ff.exec(["-i","in.mp4","-vn","-ac","1","-ar","8000","-f","s16le","a.raw"]);
+ const raw=await ff.readFile("a.raw");const s16=new Int16Array(raw.buffer,raw.byteOffset,Math.floor(raw.byteLength/2));
+ const sec=Math.floor(s16.length/8000),e=new Float32Array(sec);
+ for(let i=0;i<sec;i++){let a=0;for(let k=0;k<8000;k++){const v=s16[i*8000+k]/32768;a+=v*v}e[i]=Math.sqrt(a/8000)}
+ await ff.deleteFile("a.raw");
+ const starts=pick(e,L,n,$("mode").value,sec);
+ const vf=$("fit").value==="blur"?"split[a][b];[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];[b]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p":"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p";
+ const fc=vf.includes("[")?["-filter_complex",vf]:["-vf",vf];
+ for(let r=0;r<starts.length;r++){
+  say("Clip "+(r+1)+"/"+starts.length+" ban rahi hai...");$("pg").value=0;
+  const out="clip"+(r+1)+".mp4";
+  await ff.exec(["-ss",""+starts[r],"-t",""+L,"-i","in.mp4",...fc,"-c:v","libx264","-preset","ultrafast","-crf","25","-c:a","aac",out]);
+  const data=await ff.readFile(out);await ff.deleteFile(out);
+  const blob=new Blob([data.buffer],{type:"video/mp4"}),url=URL.createObjectURL(blob);
+  clips.push({name:out,blob,start:starts[r],len:L});
+  $("clips").insertAdjacentHTML("beforeend",`<div class="clip"><video src="${url}" controls muted playsinline></video><div class="m"><b>${out}</b><br>${Math.floor(starts[r]/60)}:${String(starts[r]%60).padStart(2,"0")} se ${L} sec, ${(blob.size/1048576).toFixed(1)} MB</div><a href="${url}" download="${out}">Download</a></div>`);
+ }
+ await ff.deleteFile("in.mp4");
+ $("res").hidden=false;$("up").hidden=false;say("Ho gaya: "+clips.length+" clips ready.");
+ }catch(err){say("Error: "+err.message);console.error(err)}
+ $("go").disabled=false;$("pg").hidden=true;
+};
+const d=new Date();d.setDate(d.getDate()+1);$("d0").value=d.toISOString().slice(0,10);
+function plan(){
+ const tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean),t0=new Date($("d0").value+"T"+$("t0").value),gap=+$("gap").value;
+ return clips.map((c,i)=>{const at=new Date(t0.getTime()+i*gap*3600e3);
+  return{file:c.name,publishAt:at.toISOString(),local:at.toLocaleString(),body:{snippet:{title:($("title").value||"Clip")+(clips.length>1?" "+(i+1):"")+" #Shorts",description:$("desc").value,tags,categoryId:"27"},status:{privacyStatus:"private",publishAt:at.toISOString(),selfDeclaredMadeForKids:$("kids").value==="true"}}}});
+}
+$("plan").onclick=()=>{const p=plan();$("planout").hidden=false;$("planout").textContent="DRY RUN, kuch upload nahi hua.\n\n"+p.map(x=>x.file+" -> "+x.local+"\n"+JSON.stringify(x.body,null,1)).join("\n\n")};
+$("cid").oninput=()=>$("real").disabled=!$("cid").value.includes(".apps.googleusercontent.com");
+$("real").onclick=()=>{
+ const p=plan();if(!confirm(p.length+" clip(s) YouTube pe upload honge. Pakka?"))return;
+ google.accounts.oauth2.initTokenClient({client_id:$("cid").value.trim(),scope:"https://www.googleapis.com/auth/youtube.upload",callback:async tk=>{
+  if(!tk.access_token){say("Google ne allow nahi kiya.");return}
+  for(let i=0;i<p.length;i++){say("Upload "+(i+1)+"/"+p.length+"...");
+   const init=await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",{method:"POST",headers:{Authorization:"Bearer "+tk.access_token,"Content-Type":"application/json","X-Upload-Content-Type":"video/mp4"},body:JSON.stringify(p[i].body)});
+   if(!init.ok){say("Upload error: "+init.status+" "+await init.text());return}
+   const r=await fetch(init.headers.get("Location"),{method:"PUT",headers:{"Content-Type":"video/mp4"},body:clips[i].blob});
+   if(!r.ok){say("Upload error: "+r.status);return}
+  }say("Upload ho gaye, schedule set.")}}).requestAccessToken();
+};
+</script></body></html>
