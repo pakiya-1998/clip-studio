@@ -55,6 +55,7 @@ pre{white-space:pre-wrap;background:#10131a;padding:10px;border-radius:8px;font-
 <label><input type="checkbox" id="e_sharp" checked>✨ Sharpen Main Video</label>
 <label><input type="checkbox" id="e_norm" checked>🔊 Normalize Audio</label>
 <label><input type="checkbox" id="e_cap">💬 Hindi Captions (free AI, phone me pehli baar ~80 MB download, galtiyan ho sakti hain)</label>
+<label style="display:block">Caption AI: <select id="cmodel" style="width:auto"><option value="Xenova/whisper-base">Tez (base, ~80 MB, kam sahi)</option><option value="Xenova/whisper-small">Behtar (small, ~250 MB, dheema)</option></select></label>
 <label><input type="checkbox" id="e_auto" checked>🧠 Har clip ka auto title / description / tags</label>
 <label><input type="checkbox" id="e_topic">📝 Add Topic on Video</label>
 <label><input type="checkbox" id="e_tag" checked>▶️ Add #Shorts to Names</label>
@@ -124,12 +125,12 @@ async function decodeAudio(f,D){if(f.size>350e6||D>2400)throw new Error("video b
  const n=b.length,ch=b.numberOfChannels,data=new Float32Array(n);for(let c=0;c<ch;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)data[i]+=d[i]/ch}
  const secs=Math.floor(n/16000),e=new Array(secs);for(let k=0;k<secs;k++){let a=0;for(let i=k*16000;i<(k+1)*16000;i++)a+=data[i]*data[i];e[k]=Math.sqrt(a/16000)}return{data,e}}
 let wk=null,wid=0;const wres={};
-const WSRC='import {pipeline,env} from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js";env.allowLocalModels=false;env.backends.onnx.wasm.proxy=false;let asr;onmessage=async e=>{const m=e.data;try{if(!asr){asr=await pipeline("automatic-speech-recognition","Xenova/whisper-base",{progress_callback:p=>postMessage({prog:p})})}const r=await asr(m.audio,{language:"hindi",task:"transcribe",chunk_length_s:30,return_timestamps:true});postMessage({id:m.id,r})}catch(err){postMessage({id:m.id,err:String((err&&err.message)||err)})}};';
+const WSRC='import {pipeline,env} from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js";env.allowLocalModels=false;env.backends.onnx.wasm.proxy=false;let asr,cur;onmessage=async e=>{const m=e.data;try{if(!asr||cur!==m.model){cur=m.model;asr=await pipeline("automatic-speech-recognition",m.model,{progress_callback:p=>postMessage({prog:p})})}const r=await asr(m.audio,{language:"hindi",task:"transcribe",chunk_length_s:30,return_timestamps:true});postMessage({id:m.id,r})}catch(err){postMessage({id:m.id,err:String((err&&err.message)||err)})}};';
 function getWk(){if(wk)return wk;wk=new Worker(URL.createObjectURL(new Blob([WSRC],{type:"text/javascript"})),{type:"module"});
  wk.onmessage=e=>{const m=e.data;if(m.prog){if(m.prog.status==="progress")say("Caption AI download: "+Math.round(m.prog.progress)+"% (pehli baar ~80 MB)");return}const f=wres[m.id];if(f){delete wres[m.id];m.err?f.rej(new Error(m.err)):f.res(m.r)}};
  wk.onerror=e=>{const msg=new Error("caption AI load nahi hua ("+(e.message||"worker")+")");Object.keys(wres).forEach(k=>{wres[k].rej(msg);delete wres[k]});wk=null};return wk}
 async function transcribe(data,s,len){const w=getWk();const sl=data.slice(Math.floor(s*16000),Math.floor((s+len)*16000));const id=++wid;
- const r=await tmo(new Promise((res,rej)=>{wres[id]={res,rej};w.postMessage({id,audio:sl},[sl.buffer])}),600000,"caption AI time-out");
+ const r=await tmo(new Promise((res,rej)=>{wres[id]={res,rej};w.postMessage({id,audio:sl,model:$("cmodel").value},[sl.buffer])}),600000,"caption AI time-out");
  const caps=(r.chunks||[]).map(c=>({s:c.timestamp[0]||0,e:c.timestamp[1]==null?len:c.timestamp[1],t:(c.text||"").trim()})).filter(c=>c.t&&c.t.length>1);
  return{text:(r.text||"").trim(),caps}}
 function metaOf(text,i,n){const base=$("topic").value.trim();const words=text.replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean);const head=words.slice(0,7).join(" ");
@@ -157,7 +158,7 @@ const once=(el,ev)=>new Promise((res,rej)=>{const ok=()=>{cl();res()},bad=()=>{c
 async function recordClip(url,start,o,onp){
  const v=document.createElement("video");v.src=url;v.playsInline=true;v.preload="auto";v.setAttribute("playsinline","");
  await tmo(once(v,"loadedmetadata"),20000,"video metadata load nahi hua");const dur=v.duration;if(!(dur>0)||start>=dur-1)throw new Error("start time video se bahar hai");const len=Math.min(o.L,Math.floor(dur-start));
- v.currentTime=start;await tmo(once(v,"seeked"),20000,"video seek nahi hua");
+ v.currentTime=start;await tmo(once(v,"seeked"),45000,"video seek nahi hua");
  const W=o.W,H=o.H,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
  const t=document.createElement("canvas");t.width=54;t.height=96;const tx=t.getContext("2d");
  const vw=v.videoWidth,vh=v.videoHeight;let thumb=null,thumbBusy=false;
@@ -192,8 +193,12 @@ async function goSafe(){
  else if($("mode").value==="loud"&&au)starts=pick(au.e,o.L,o.n,"loud",D);
  else{const step=Math.max(o.L,Math.floor(D/o.n));starts=[];for(let i=0;i<o.n&&i*step<D-2;i++)starts.push(i*step)}
  if(!starts.length)throw new Error("start time sahi nahi");
- for(let r=0;r<starts.length;r++){let oc={...o},tr={text:"",caps:[]};
+ const TR=[];
+ for(let r=0;r<starts.length;r++){let tr={text:"",caps:[]};
   if(au&&(wantCap||wantAuto)){stage="clip "+(r+1)+" captions";say("Clip "+(r+1)+"/"+starts.length+" ki awaaz sun raha hu (Hindi captions)...");try{tr=await transcribe(au.data,starts[r],o.L)}catch(e){console.error(e);say("Captions nahi ban paye ("+((e&&e.message)||e)+"), bina captions aage badh raha hu.");await new Promise(q=>setTimeout(q,2000))}}
+  TR.push(tr)}
+ if(wk){wk.terminate();wk=null}au=null;
+ for(let r=0;r<starts.length;r++){let oc={...o};const tr=TR[r];
   const m=metaOf(tr.text,r,starts.length);oc.caps=wantCap?tr.caps:[];oc.thumbText=wantAuto&&tr.text?m.head:($("topic").value||"");
   stage="clip "+(r+1);say("Clip "+(r+1)+"/"+starts.length+" record ho rahi hai ("+o.L+" sec lagenge, screen on rakho, tab mat badlo)...");$("pg").value=0;
   const R=await recordClip(url,starts[r],oc,p=>$("pg").value=p);if(!R.blob.size)throw new Error("clip khali aayi");
